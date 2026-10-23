@@ -1,0 +1,12 @@
+{
+  "name": "crayon-city-cloudflare",
+  "private": true,
+  "scripts": {
+    "build": "python ../build_static.py ../artifact-page.html && node -e \"require('fs').copyFileSync('../static/index.html','public/index.html')\"",
+    "deploy": "npm run build && wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^4.40.0"
+  }
+}

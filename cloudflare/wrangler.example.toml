@@ -1,0 +1,22 @@
+# Crayon City on Cloudflare Workers. Copy this file to wrangler.toml (which is not in git) and fill it in.
+#   npx wrangler login                          once, opens the browser
+#   npx wrangler kv namespace create CARS        once; paste the id below
+#   npx wrangler secret put CRAYON_PIN
+#   npx wrangler secret put ANTHROPIC_API_KEY   optional: lets Claude guess the car type and name
+#   npm run deploy                              rebuilds the page and uploads everything
+name = "crayon-city"                            # becomes https://crayon-city.<your subdomain>.workers.dev
+main = "src/worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "none"
+
+[[kv_namespaces]]
+binding = "CARS"
+id = "paste the id from 'wrangler kv namespace create CARS' here"
+
+[observability]
+enabled = true

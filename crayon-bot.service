@@ -1,0 +1,14 @@
+[Unit]
+Description=Crayon City Telegram bot
+After=network.target crayon-city.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/crayon-city
+EnvironmentFile=/home/ubuntu/crayon-city/.env
+ExecStart=/home/ubuntu/crayon-city/.venv/bin/python -u telegram_bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

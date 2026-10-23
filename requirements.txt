@@ -1,0 +1,8 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+anthropic>=1.0
+numpy>=1.26
+pillow>=10.0
+scipy>=1.11
+rembg[cpu]>=2.0      # background removal for the Telegram bot (downloads a 180 MB model on first use)
