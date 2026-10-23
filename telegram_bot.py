@@ -90,6 +90,8 @@ def find_paper(img: Image.Image) -> Image.Image:
     x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
     if (x1 - x0) * (y1 - y0) > 0.93 * h * w:
         return img  # the photo already is the paper
+    if areas[big] < 0.72 * (x1 - x0 + 1) * (y1 - y0 + 1):
+        return img  # bright but not a rectangle: a pale car on a dark table, not a sheet
     # step a little inside the sheet so its edges and the table never count as drawing
     mx_in, my_in = int((x1 - x0) * 0.03) + 2, int((y1 - y0) * 0.03) + 2
     return img.crop((x0 + mx_in, y0 + my_in, x1 - mx_in + 1, y1 - my_in + 1))
@@ -207,21 +209,38 @@ def cutout_model(img: Image.Image):
     return finish(np.asarray(small.convert("RGB")), alpha)
 
 
+def upright(cut):
+    """A car photographed standing on its nose would drive as a tall sliver: turn portrait cutouts
+    to landscape, with the side that holds the dark wheels at the bottom."""
+    if cut is None or cut.height < 1.3 * cut.width:
+        return cut
+    a = np.asarray(cut.convert("RGBA")).astype(np.float32)
+    opaque = a[..., 3] > 128
+    dark = opaque & (a[..., :3].mean(2) < 90)
+    half = cut.width // 2
+    left = dark[:, :half].sum() / max(1, opaque[:, :half].sum())
+    right = dark[:, half:].sum() / max(1, opaque[:, half:].sum())
+    # PIL rotates counter-clockwise: +90 brings the left edge to the bottom, -90 the right edge
+    return cut.rotate(90 if left >= right else -90, expand=True)
+
+
 def process_photo(data: bytes):
     img = load_photo(data)
     sheet = find_paper(img)
     if REMBG_MODEL.lower() not in ("", "off", "0", "no"):
         try:
-            cut = cutout_model(sheet)
-            if cut is not None and cut.width >= 24 and cut.height >= 24:
-                return cut
+            # the sheet first (a drawing on paper), then the whole photo (a cut-out car on a table)
+            for src in ([sheet, img] if sheet.size != img.size else [img]):
+                cut = cutout_model(src)
+                if cut is not None and cut.width >= 24 and cut.height >= 24:
+                    return upright(cut)
             print("[bot] model found no object; using the paper method")
         except Exception as exc:
             print(f"[bot] background model failed ({exc}); using the paper method")
     cut = cutout(sheet)
     if cut is None or cut.width < 24 or cut.height < 24:
         cut = cutout(sheet, sens=0.3)
-    return cut
+    return upright(cut)
 
 
 def png_bytes(img: Image.Image) -> bytes:
@@ -380,6 +399,8 @@ def handle_photo(msg: dict):
         send(chat_id, f"Could not reach the city server: {exc}")
         return
     caption = f"{car['name']} ({LABELS[car['type']]}) is on the road, front pointing {car['facing']}."
+    if not c_facing:
+        caption += f"\nDriving backwards? Send: /flip {car['name']}"
     if not c_type:
         caption += "\nWrong type? Send the photo again with a caption like: police Blue Flash"
     try:
@@ -397,7 +418,7 @@ def handle_text(msg: dict):
     if cmd in ("/start", "/help"):
         send(chat_id, "Send me a photo of a colored car drawing and it will drive in Crayon City.\n"
                       "Add a caption to steer it, for example: police Blue Flash, or: taxi left Sunny.\n"
-                      "/cars lists the cars, /remove <name> takes one off the road.")
+                      "/cars lists the cars, /flip <name> turns one around, /remove <name> takes one off the road.")
     elif cmd == "/cars":
         try:
             cars = server_cars()
@@ -405,16 +426,24 @@ def handle_text(msg: dict):
             send(chat_id, f"Could not reach the city server: {exc}")
             return
         send(chat_id, "No cars yet." if not cars else "\n".join(f"• {c['name']} ({LABELS.get(c['type'], c['type'])})" for c in cars))
-    elif cmd == "/remove":
+    elif cmd in ("/remove", "/flip"):
         want = arg.strip().lower()
         if not want:
-            send(chat_id, "Which one? /remove <name>")
+            send(chat_id, f"Which one? {cmd} <name>")
             return
         try:
             cars = server_cars()
             hit = next((c for c in cars if c["name"].lower() == want), None) or next((c for c in cars if want in c["name"].lower()), None)
             if not hit:
                 send(chat_id, f"No car called {arg.strip()}.")
+                return
+            if cmd == "/flip":
+                # the city has no edit call: re-add the same picture with the other facing, then drop the old car
+                _, png = http("GET", f"{CRAYON_URL}/images/{hit['image']}")
+                facing = "left" if hit.get("facing") == "right" else "right"
+                server_add(png, hit["name"], hit["type"], facing)
+                server_delete(hit["id"])
+                send(chat_id, f"{hit['name']} turned around, front now pointing {facing}.")
                 return
             server_delete(hit["id"])
             send(chat_id, f"{hit['name']} left the city.")

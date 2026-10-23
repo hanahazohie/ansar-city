@@ -138,9 +138,11 @@ phone.
    VM), so photos of toy cars and screenshots work too, not only drawings on paper. If the
    model finds nothing it falls back to the plain paper method. `REMBG_MODEL=off` in `.env`
    disables the model. Set `CRAYON_KEEP=/some/dir` to keep the last 40 incoming photos so a
-   bad cutout can be looked at later. Optional caption words steer it: `police Blue Flash`
-   sets the type and name; `left` or `right` says which way the front points. `/cars` lists
-   the cars and `/remove Blue Flash` takes one off the road.
+   bad cutout can be looked at later. A car photographed standing on its nose is turned
+   to lie on its wheels. Optional caption words steer it: `police Blue Flash` sets the type
+   and name; `left` or `right` says which way the front points. `/cars` lists the cars,
+   `/flip Blue Flash` turns one around if it drives backwards, and `/remove Blue Flash`
+   takes one off the road.
 
 The bot talks to the server over its API with the same PIN, so it needs `CRAYON_PIN`
 in `.env` too. To run it on your PC against the local server, set the same variables
